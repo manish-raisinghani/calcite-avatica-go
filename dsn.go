@@ -43,7 +43,7 @@ type Config struct {
 	location             *time.Location
 	schema               string
 	transactionIsolation uint32
-	InsecureSkipVerify   bool
+	batching             bool
 	RootCAs              string
 
 	authentication      authentication
@@ -68,6 +68,7 @@ func ParseDSN(dsn string) (*Config, error) {
 		frameMaxSize:         -1,
 		location:             time.UTC,
 		transactionIsolation: 0,
+		batching:             false,
 	}
 
 	parsed, err := url.ParseRequestURI(dsn)
@@ -77,11 +78,6 @@ func ParseDSN(dsn string) (*Config, error) {
 	}
 
 	queries := parsed.Query()
-
-	if v := queries.Get("insecureSkipVerify"); v != "" {
-		b, _ := strconv.ParseBool(v)
-		conf.InsecureSkipVerify = b
-	}
 
 	if v := queries.Get("rootCAs"); v != "" {
 		conf.RootCAs = v
@@ -133,6 +129,12 @@ func ParseDSN(dsn string) (*Config, error) {
 		}
 
 		conf.transactionIsolation = uint32(isolation)
+	}
+
+	if v := queries.Get("batching"); v != "" {
+		if v == "true" {
+			conf.batching = true
+		}
 	}
 
 	if v := queries.Get("authentication"); v != "" {

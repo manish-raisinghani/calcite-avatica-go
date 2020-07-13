@@ -31,7 +31,7 @@ import (
 	"runtime"
 	"time"
 
-	avaticaMessage "github.com/apache/calcite-avatica-go/v4/message"
+	avaticaMessage "github.com/apache/calcite-avatica-go/v5/message"
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/xerrors"
 )
@@ -81,7 +81,6 @@ func NewHTTPClient(host string, baseClient *http.Client, config *Config) (*httpC
 				MaxIdleConnsPerHost:   runtime.GOMAXPROCS(0) + 1,
 				TLSClientConfig: &tls.Config{
 					RootCAs: certs,
-					InsecureSkipVerify: config.InsecureSkipVerify,
 				},
 			},
 		}
