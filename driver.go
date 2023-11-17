@@ -18,7 +18,7 @@
 /*
 Package avatica provides an Apache Phoenix Query Server/Avatica driver for Go's database/sql package.
 
-Quickstart
+# Quickstart
 
 Import the database/sql package along with the avatica driver.
 
@@ -35,6 +35,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"net/http"
 
 	"github.com/apache/calcite-avatica-go/v5/generic"
@@ -42,7 +43,6 @@ import (
 	"github.com/apache/calcite-avatica-go/v5/message"
 	"github.com/apache/calcite-avatica-go/v5/phoenix"
 	"github.com/hashicorp/go-uuid"
-	"golang.org/x/xerrors"
 )
 
 // Driver is exported to allow it to be used directly.
@@ -58,7 +58,10 @@ type Connector struct {
 
 // NewConnector creates a new connector
 func NewConnector(dsn string) driver.Connector {
-	return &Connector{nil, nil, dsn}
+	return &Connector{
+		Info: make(map[string]string),
+		dsn:  dsn,
+	}
 }
 
 func (c *Connector) Connect(context.Context) (driver.Conn, error) {
@@ -66,53 +69,38 @@ func (c *Connector) Connect(context.Context) (driver.Conn, error) {
 	config, err := ParseDSN(c.dsn)
 
 	if err != nil {
-		return nil, xerrors.Errorf("unable to open connection: %v", err)
+		return nil, fmt.Errorf("unable to open connection: %w", err)
 	}
 
-	httpClient, err := NewHTTPClient(config.endpoint, c.Client, config)
-
-	if err != nil {
-		return nil, xerrors.Errorf("unable to create HTTP client: %v", err)
+	// propagate user and password to connector info so that it's available in JDBC context for example
+	if config.avaticaUser != "" {
+		c.Info["user"] = config.avaticaUser
+	}
+	if config.avaticaPassword != "" {
+		c.Info["password"] = config.avaticaPassword
 	}
 
 	connectionId, err := uuid.GenerateUUID()
 	if err != nil {
-		return nil, xerrors.Errorf("error generating connection id: %v", err)
+		return nil, fmt.Errorf("error generating connection id: %w", err)
 	}
-
-	info := map[string]string{
-		"AutoCommit":  "true",
-		"Consistency": "8",
-	}
-
-	for k, v := range c.Info {
-		info[k] = v
-	}
-
-	conn := &conn{
-		connectionId: connectionId,
-		httpClient:   httpClient,
-		config:       config,
-	}
-
-	// Open a connection to the server
-	req := &message.OpenConnectionRequest{
-		ConnectionId: connectionId,
-		Info:         info,
-	}
-
-	if config.schema != "" {
-		req.Info["schema"] = config.schema
-	}
-
-	_, err = httpClient.post(context.Background(), req)
+	httpClient, err := NewHTTPClient(config.endpoint, c.Client, config)
 
 	if err != nil {
-		return nil, conn.avaticaErrorToResponseErrorOrError(err)
+		return nil, fmt.Errorf("unable to create HTTP client: %w", err)
 	}
-
-	response, err := httpClient.post(context.Background(), &message.DatabasePropertyRequest{
-		ConnectionId: connectionId,
+	conn := &conn{
+		connectionId:  connectionId,
+		httpClient:    httpClient,
+		config:        config,
+		connectorInfo: c.Info,
+	}
+	err = registerConn(conn)
+	if err != nil {
+		return nil, err
+	}
+	response, err := conn.httpClient.post(context.Background(), &message.DatabasePropertyRequest{
+		ConnectionId: conn.connectionId,
 	})
 
 	if err != nil {
@@ -132,6 +120,29 @@ func (c *Connector) Connect(context.Context) (driver.Conn, error) {
 	conn.adapter = getAdapter(adapter)
 
 	return conn, nil
+}
+
+func registerConn(conn *conn) error {
+	info := map[string]string{
+		"AutoCommit":  "true",
+		"Consistency": "8",
+	}
+	for k, v := range conn.connectorInfo {
+		info[k] = v
+	}
+	// Open a connection to the server
+	req := &message.OpenConnectionRequest{
+		ConnectionId: conn.connectionId,
+		Info:         info,
+	}
+	if conn.config.schema != "" {
+		req.Info["schema"] = conn.config.schema
+	}
+	_, err := conn.httpClient.post(context.Background(), req)
+	if err != nil {
+		return conn.avaticaErrorToResponseErrorOrError(err)
+	}
+	return nil
 }
 
 // Driver returns the underlying driver

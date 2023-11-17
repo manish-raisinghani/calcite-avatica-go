@@ -37,6 +37,10 @@ init_upload(){
     apk --no-cache add git subversion
 }
 
+make_directory_safe_for_git(){
+   git config --global --add safe.directory /source
+}
+
 KEYS=()
 
 GPG_COMMAND="gpg"
@@ -159,6 +163,8 @@ select_gpg_key(){
 check_release_guidelines(){
 
     # Exclude files without the Apache license header
+    missingHeaders=0
+
     for i in $(git ls-files); do
        case "$i" in
        # The following are excluded from the license header check
@@ -172,13 +178,20 @@ check_release_guidelines(){
        # Binaries
        (test-fixtures/calcite.png);;
 
-       (*) grep -q "Licensed to the Apache Software Foundation" $i || echo "$i has no header";;
+       (*) if ! grep -q "Licensed to the Apache Software Foundation" $i; then
+             echo "$i has no header" && ((missingHeaders=missingHeaders+1))
+           fi;;
        esac
     done
 
     # Check copyright year in NOTICE
     if ! grep -Fq "Copyright 2012-$(date +%Y)" NOTICE; then
         echo "Ending copyright year in NOTICE is not $(date +%Y)"
+        exit 1
+    fi
+
+    if [[ $missingHeaders -gt 0 ]]; then
+        echo "Some files are missing the Apache license header"
         exit 1
     fi
 }
@@ -205,10 +218,10 @@ check_if_tag_exists(){
 
 check_local_remote_are_even(){
     REMOTE_COMMIT=$(git ls-remote $GITBOX_URL | head -1 | sed "s/[[:space:]]HEAD//")
-    LOCAL_COMMIT=$(git rev-parse master)
+    LOCAL_COMMIT=$(git rev-parse main)
 
     if [[ $REMOTE_COMMIT != $LOCAL_COMMIT ]]; then
-        echo "Master in Apache repository is not even with local master"
+        echo "Main branch in Apache repository is not even with local branch main"
         exit 1
     fi
 }
@@ -289,8 +302,8 @@ make_release_artifacts(){
 
     CURRENT_BRANCH=$(git branch | grep \* | cut -d ' ' -f2)
 
-    if [ $CURRENT_BRANCH != "master" ]; then
-        echo "You are currently on the $CURRENT_BRANCH branch. A release must be made from the master branch. Exiting..."
+    if [ $CURRENT_BRANCH != "main" ]; then
+        echo "You are currently on the $CURRENT_BRANCH branch. A release must be made from the main branch. Exiting..."
         exit 1
     fi
 
@@ -452,7 +465,7 @@ Hi all,
 I have created a release for Apache Calcite Avatica Go $TAG_WITHOUT_RC, release candidate $RC_NUMBER.
 
 Thanks to everyone who has contributed to this release. The release notes are available here:
-https://github.com/apache/calcite-avatica-go/blob/$COMMIT/site/_docs/go_history.md
+https://github.com/apache/calcite-avatica-go/blob/$LATEST_TAG/site/_docs/go_history.md
 
 The commit to be voted on:
 https://gitbox.apache.org/repos/asf?p=calcite-avatica-go.git;a=commit;h=$COMMIT
@@ -469,13 +482,13 @@ Release artifacts are signed with the following key:
 https://people.apache.org/keys/committer/$ASF_USERNAME.asc
 
 Instructions for running the test suite is located here:
-https://github.com/apache/calcite-avatica-go/blob/$COMMIT/site/develop/avatica-go.md#testing
+https://github.com/apache/calcite-avatica-go/blob/$LATEST_TAG/site/develop/avatica-go.md#testing
 
 Please vote on releasing this package as Apache Calcite Avatica Go $TAG_WITHOUT_RC.
 
-To run the tests without a Go environment, install docker and docker-compose. Then, in the root of the release's directory, run: docker-compose run test
+To run the tests without a Go environment, install docker and docker compose. Then, in the root of the release's directory, run: docker compose run test
 
-When the test suite completes, run \"docker-compose down\" to remove and shutdown all the containers.
+When the test suite completes, run \"docker compose down\" to remove and shutdown all the containers.
 
 The vote is open for the next 72 hours and passes if a majority of at least three +1 PMC votes are cast.
 
@@ -562,20 +575,10 @@ compile_protobuf(){
         echo "The PROTOBUF_VERSION environment variable must be set to a valid protobuf version"
     fi
 
-    if [ -z "$GLIBC_VERSION" ]; then
-        echo "The GLIBC_VERSION environment variable must be set to a valid protobuf version"
-    fi
-
-    apk --no-cache add ca-certificates git wget
-
-    # Install glibc
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
-    wget -q -O /tmp/glibc.apk https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk
-    apk add /tmp/glibc.apk
-
+    apt update && apt install unzip
 
     # Install go protobuf compiler
-    go install github.com/golang/protobuf/protoc-gen-go
+    go install google.golang.org/protobuf/cmd/protoc-gen-go
 
     # Install protoc
     mkdir -p /tmp/protoc
@@ -597,7 +600,8 @@ compile_protobuf(){
     git checkout FETCH_HEAD
 
     # Compile the protobuf
-    protoc --proto_path=/tmp/avatica/core/src/main/protobuf --go_out=import_path=message:/source/message/ /tmp/avatica/core/src/main/protobuf/*.proto
+    GITHUB_PACKAGE=github.com/apache/calcite-avatica-go
+    protoc --proto_path=/tmp/avatica/core/src/main/protobuf --go_out=/source --go_opt=module=$GITHUB_PACKAGE --go_opt=Mcommon.proto=$GITHUB_PACKAGE/message --go_opt=Mrequests.proto=$GITHUB_PACKAGE/message --go_opt=Mresponses.proto=$GITHUB_PACKAGE/message /tmp/avatica/core/src/main/protobuf/*.proto
 
     echo "Protobuf compiled successfully"
 }
@@ -605,12 +609,14 @@ compile_protobuf(){
 case $1 in
     dry-run)
         init_release
+        make_directory_safe_for_git
         mount_gpg_keys
         make_release_artifacts
         ;;
 
     release)
         init_release
+        make_directory_safe_for_git
         mount_gpg_keys
         make_release_artifacts_and_push_tag
         ;;
@@ -622,11 +628,13 @@ case $1 in
 
     publish-release-for-voting)
         init_upload
+        make_directory_safe_for_git
         publish_release_for_voting
         ;;
 
     promote-release)
         init_upload
+        make_directory_safe_for_git
         promote_release
         ;;
 

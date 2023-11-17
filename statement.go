@@ -20,19 +20,19 @@ package avatica
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/apache/calcite-avatica-go/v5/message"
-	"golang.org/x/xerrors"
 )
 
 type stmt struct {
 	statementID  uint32
 	conn         *conn
 	parameters   []*message.AvaticaParameter
-	handle       message.StatementHandle
+	handle       *message.StatementHandle
 	batchUpdates []*message.UpdateBatch
 	sync.Mutex
 }
@@ -108,16 +108,16 @@ func (s *stmt) exec(ctx context.Context, args []namedValue) (driver.Result, erro
 	}
 
 	msg := &message.ExecuteRequest{
-		StatementHandle:    &s.handle,
+		StatementHandle:    s.handle,
 		ParameterValues:    values,
 		FirstFrameMaxSize:  s.conn.config.frameMaxSize,
 		HasParameterValues: true,
 	}
 
 	if s.conn.config.frameMaxSize <= -1 {
-		msg.DeprecatedFirstFrameMaxSize = math.MaxInt64
+		msg.FirstFrameMaxSize = math.MaxInt32
 	} else {
-		msg.DeprecatedFirstFrameMaxSize = uint64(s.conn.config.frameMaxSize)
+		msg.FirstFrameMaxSize = s.conn.config.frameMaxSize
 	}
 
 	res, err := s.conn.httpClient.post(ctx, msg)
@@ -129,7 +129,7 @@ func (s *stmt) exec(ctx context.Context, args []namedValue) (driver.Result, erro
 	results := res.(*message.ExecuteResponse).Results
 
 	if len(results) <= 0 {
-		return nil, xerrors.New("empty ResultSet in ExecuteResponse")
+		return nil, errors.New("empty ResultSet in ExecuteResponse")
 	}
 
 	// Currently there is only 1 ResultSet per response
@@ -153,16 +153,16 @@ func (s *stmt) query(ctx context.Context, args []namedValue) (driver.Rows, error
 	}
 
 	msg := &message.ExecuteRequest{
-		StatementHandle:    &s.handle,
+		StatementHandle:    s.handle,
 		ParameterValues:    s.parametersToTypedValues(args),
 		FirstFrameMaxSize:  s.conn.config.frameMaxSize,
 		HasParameterValues: true,
 	}
 
 	if s.conn.config.frameMaxSize <= -1 {
-		msg.DeprecatedFirstFrameMaxSize = math.MaxInt64
+		msg.FirstFrameMaxSize = math.MaxInt32
 	} else {
-		msg.DeprecatedFirstFrameMaxSize = uint64(s.conn.config.frameMaxSize)
+		msg.FirstFrameMaxSize = s.conn.config.frameMaxSize
 	}
 
 	res, err := s.conn.httpClient.post(ctx, msg)
@@ -173,7 +173,7 @@ func (s *stmt) query(ctx context.Context, args []namedValue) (driver.Rows, error
 
 	resultSet := res.(*message.ExecuteResponse).Results
 
-	return newRows(s.conn, s.statementID, resultSet), nil
+	return newRows(s.conn, s.statementID, false, resultSet), nil
 }
 
 func (s *stmt) parametersToTypedValues(vals []namedValue) []*message.TypedValue {
@@ -222,7 +222,7 @@ func (s *stmt) parametersToTypedValues(vals []namedValue) []*message.TypedValue 
 
 					// Calculate milliseconds since 00:00:00.000
 					base := time.Date(v.Year(), v.Month(), v.Day(), 0, 0, 0, 0, time.FixedZone(zone, offset))
-					typed.NumberValue = int64(v.Sub(base).Nanoseconds() / int64(time.Millisecond))
+					typed.NumberValue = v.Sub(base).Nanoseconds() / int64(time.Millisecond)
 
 				case "DATE", "UNSIGNED_DATE":
 					typed.Type = message.Rep_JAVA_SQL_DATE
@@ -244,7 +244,7 @@ func (s *stmt) parametersToTypedValues(vals []namedValue) []*message.TypedValue 
 
 					// Calculate number of milliseconds since 1970-01-01 00:00:00.000
 					base := time.Date(1970, 1, 1, 0, 0, 0, 0, time.FixedZone(zone, offset))
-					typed.NumberValue = int64(v.Sub(base).Nanoseconds() / int64(time.Millisecond))
+					typed.NumberValue = v.Sub(base).Nanoseconds() / int64(time.Millisecond)
 				}
 			}
 		}

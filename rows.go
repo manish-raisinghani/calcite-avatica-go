@@ -38,8 +38,10 @@ type resultSet struct {
 type rows struct {
 	conn             *conn
 	statementID      uint32
+	closeStatement   bool
 	resultSets       []*resultSet
 	currentResultSet int
+	columnNames      []string
 }
 
 // Columns returns the names of the columns. The number of
@@ -47,21 +49,28 @@ type rows struct {
 // slice.  If a particular column name isn't known, an empty
 // string should be returned for that entry.
 func (r *rows) Columns() []string {
-
+	if r.columnNames != nil {
+		return r.columnNames
+	}
 	var cols []string
-
+	if len(r.resultSets) == 0 {
+		return cols
+	}
 	for _, column := range r.resultSets[r.currentResultSet].columns {
 		cols = append(cols, column.Name)
 	}
-
+	r.columnNames = cols
 	return cols
 }
 
 // Close closes the rows iterator.
 func (r *rows) Close() error {
-
+	var err error
+	if r.closeStatement {
+		err = r.conn.closeStatement(context.Background(), r.statementID)
+	}
 	r.conn = nil
-	return nil
+	return err
 }
 
 // Next is called to populate the next row of data into
@@ -74,7 +83,9 @@ func (r *rows) Close() error {
 //
 // Next should return io.EOF when there are no more rows.
 func (r *rows) Next(dest []driver.Value) error {
-
+	if len(r.resultSets) == 0 {
+		return io.EOF
+	}
 	resultSet := r.resultSets[r.currentResultSet]
 
 	if resultSet.currentRow >= len(resultSet.data) {
@@ -132,7 +143,7 @@ func (r *rows) Next(dest []driver.Value) error {
 }
 
 // newRows create a new set of rows from a result set.
-func newRows(conn *conn, statementID uint32, resultSets []*message.ResultSetResponse) *rows {
+func newRows(conn *conn, statementID uint32, closeStatement bool, resultSets []*message.ResultSetResponse) *rows {
 
 	var rsets []*resultSet
 
@@ -173,6 +184,7 @@ func newRows(conn *conn, statementID uint32, resultSets []*message.ResultSetResp
 	return &rows{
 		conn:             conn,
 		statementID:      statementID,
+		closeStatement:   closeStatement,
 		resultSets:       rsets,
 		currentResultSet: 0,
 	}

@@ -1,13 +1,20 @@
 module github.com/zeroen/calcite-avatica-go/v5
 
-go 1.12
+go 1.17
 
 require (
-	github.com/apache/calcite-avatica-go/v5 v5.0.0-rc0
-	github.com/golang/protobuf v1.3.5
-	github.com/hashicorp/go-uuid v1.0.2
-	github.com/jcmturner/gokrb5/v8 v8.4.0
-	github.com/unchartedsoftware/witch v0.0.0-20200617171400-4f405404126f
-	github.com/xinsnake/go-http-digest-auth-client v0.6.0
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+	github.com/hashicorp/go-uuid v1.0.3
+	github.com/icholy/digest v0.1.22
+	github.com/jcmturner/gokrb5/v8 v8.4.4
+	google.golang.org/protobuf v1.30.0
+)
+
+require (
+	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
+	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
+	github.com/jcmturner/gofork v1.7.6 // indirect
+	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
+	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 )
