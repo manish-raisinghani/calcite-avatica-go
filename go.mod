@@ -3,6 +3,7 @@ module github.com/zeroen/calcite-avatica-go/v5
 go 1.17
 
 require (
+	github.com/apache/calcite-avatica-go/v5 v5.2.0-rc0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/icholy/digest v0.1.22
 	github.com/jcmturner/gokrb5/v8 v8.4.4
