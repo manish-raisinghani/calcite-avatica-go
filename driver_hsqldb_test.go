@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"database/sql"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -187,7 +186,7 @@ func TestHSQLDBDataTypes(t *testing.T) {
 			tmstmpValue time.Time = time.Date(2100, 2, 1, 21, 21, 21, 222000000, time.UTC)
 		)
 
-		copy(binValue[:], []byte("test"))
+		copy(binValue[:], "test")
 
 		// dbt.mustExec(`INSERT INTO `+dbt.tableName+` (int, tint, sint, bint, num, dec, re, flt, dbl, bool, ch, var, bin, varbin, dt, tm, tmstmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		dbt.mustExec(`INSERT INTO `+dbt.tableName+` (int, tint, sint, bint, num, dec, re, flt, dbl, bool, ch, var, bin, varbin, dt, tmstmp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -692,7 +691,7 @@ func TestHSQLDBStoreAndRetrieveBinaryData(t *testing.T) {
 
 		filePath := filepath.Join("test-fixtures", "calcite.png")
 
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 
 		if err != nil {
 			t.Fatalf("Unable to read text-fixture: %s", filePath)

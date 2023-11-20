@@ -24,7 +24,7 @@ import (
 	"crypto/x509"
 	"database/sql/driver"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -32,8 +32,7 @@ import (
 	"time"
 
 	avaticaMessage "github.com/apache/calcite-avatica-go/v5/message"
-	"github.com/golang/protobuf/proto"
-	"golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -72,7 +71,6 @@ func NewHTTPClient(host string, baseClient *http.Client, config *Config) (*httpC
 				DialContext: (&net.Dialer{
 					Timeout:   30 * time.Second,
 					KeepAlive: 30 * time.Second,
-					DualStack: true,
 				}).DialContext,
 				MaxIdleConns:          100,
 				IdleConnTimeout:       90 * time.Second,
@@ -94,7 +92,7 @@ func NewHTTPClient(host string, baseClient *http.Client, config *Config) (*httpC
 			realm := config.principal.realm
 			cli, err := WithKerberosAuth(baseClient, user, realm, config.keytab, config.krb5Conf, config.krb5CredentialCache)
 			if err != nil {
-				return nil, xerrors.Errorf("can't add kerberos authentication to http client: %v", err)
+				return nil, fmt.Errorf("can't add kerberos authentication to http client: %w", err)
 			}
 			baseClient = cli
 		}
@@ -114,7 +112,7 @@ func (c *httpClient) post(ctx context.Context, message proto.Message) (proto.Mes
 	wrapped, err := proto.Marshal(message)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error marshaling request message to protobuf: %v", err)
+		return nil, fmt.Errorf("error marshaling request message to protobuf: %w", err)
 	}
 
 	wire := &avaticaMessage.WireMessage{
@@ -125,13 +123,13 @@ func (c *httpClient) post(ctx context.Context, message proto.Message) (proto.Mes
 	body, err := proto.Marshal(wire)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error marshaling wire message to protobuf: %v", err)
+		return nil, fmt.Errorf("error marshaling wire message to protobuf: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", c.host, bytes.NewReader(body))
 
 	if err != nil {
-		return nil, xerrors.Errorf("error creating http request: %v", err)
+		return nil, fmt.Errorf("error creating http request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-google-protobuf")
@@ -141,19 +139,19 @@ func (c *httpClient) post(ctx context.Context, message proto.Message) (proto.Mes
 	res, err := c.httpClient.Do(req)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error executing http request: %v", err)
+		return nil, fmt.Errorf("error executing http request: %w", err)
 	}
 
 	defer res.Body.Close()
 
-	response, err := ioutil.ReadAll(res.Body)
+	response, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return nil, xerrors.Errorf("error executing http request. Code: %d - Body:%s", res.StatusCode, response)
+		return nil, fmt.Errorf("error executing http request. Code: %d - Body:%s", res.StatusCode, response)
 	}
 
 	result := &avaticaMessage.WireMessage{}
@@ -161,19 +159,19 @@ func (c *httpClient) post(ctx context.Context, message proto.Message) (proto.Mes
 	err = proto.Unmarshal(response, result)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error unmarshaling wire message: %v. Code: %d - Body:%s", err, res.StatusCode, response)
+		return nil, fmt.Errorf("error unmarshaling wire message: %v. Code: %d - Body:%s", err, res.StatusCode, response)
 	}
 
 	inner, err := responseFromClassName(result.Name)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error getting wrapped response from wire message: %v", err)
+		return nil, fmt.Errorf("error getting wrapped response from wire message: %w", err)
 	}
 
 	err = proto.Unmarshal(result.WrappedMessage, inner)
 
 	if err != nil {
-		return nil, xerrors.Errorf("error unmarshaling wrapped message: %v - Content: %s", err, result.WrappedMessage)
+		return nil, fmt.Errorf("error unmarshaling wrapped message: %v - Content: %s", err, result.WrappedMessage)
 	}
 
 	if v, ok := inner.(*avaticaMessage.ErrorResponse); ok {

@@ -18,57 +18,59 @@
 package avatica
 
 import (
+	"fmt"
 	"net/http"
 
+	digestTransport "github.com/icholy/digest"
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/config"
 	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	gokrbSPNEGO "github.com/jcmturner/gokrb5/v8/spnego"
-	digest_auth_client "github.com/xinsnake/go-http-digest-auth-client"
-	"golang.org/x/xerrors"
 )
 
-// WithDigestAuth takes an http client and prepares it to authenticate using digest authentication
+// WithDigestAuth takes a http client and prepares it to authenticate using digest authentication
 func WithDigestAuth(cli *http.Client, username, password string) *http.Client {
-	rt := digest_auth_client.NewTransport(username, password)
-	cli.Transport = &rt
+	cli.Transport = &digestTransport.Transport{
+		Username: username,
+		Password: password,
+	}
 	return cli
 }
 
-// WithBasicAuth takes an http client and prepares it to authenticate using basic authentication
+// WithBasicAuth takes a http client and prepares it to authenticate using basic authentication
 func WithBasicAuth(cli *http.Client, username, password string) *http.Client {
 	rt := &basicAuthTransport{cli.Transport, username, password}
 	cli.Transport = rt
 	return cli
 }
 
-// WithKerberosAuth takes an http client prepares it to authenticate using kerberos
+// WithKerberosAuth takes a http client prepares it to authenticate using kerberos
 func WithKerberosAuth(cli *http.Client, username, realm, keyTab, krb5Conf, krb5CredentialCache string) (*http.Client, error) {
 	var kerberosClient *client.Client
 	if krb5CredentialCache != "" {
 		tc, err := credentials.LoadCCache(krb5CredentialCache)
 		if err != nil {
-			return nil, xerrors.Errorf("error reading kerberos ticket cache: %v", err)
+			return nil, fmt.Errorf("error reading kerberos ticket cache: %w", err)
 		}
 		kc, err := client.NewFromCCache(tc, config.New())
 		if err != nil {
-			return nil, xerrors.Errorf("error creating kerberos client: %v", err)
+			return nil, fmt.Errorf("error creating kerberos client: %w", err)
 		}
 		kerberosClient = kc
 	} else {
 		cfg, err := config.Load(krb5Conf)
 		if err != nil {
-			return nil, xerrors.Errorf("error reading kerberos config: %v", err)
+			return nil, fmt.Errorf("error reading kerberos config: %w", err)
 		}
 		kt, err := keytab.Load(keyTab)
 		if err != nil {
-			return nil, xerrors.Errorf("error reading kerberos keytab: %v", err)
+			return nil, fmt.Errorf("error reading kerberos keytab: %w", err)
 		}
 		kc := client.NewWithKeytab(username, realm, kt, cfg)
 		err = kc.Login()
 		if err != nil {
-			return nil, xerrors.Errorf("error performing kerberos login with keytab: %v", err)
+			return nil, fmt.Errorf("error performing kerberos login with keytab: %w", err)
 		}
 		kerberosClient = kc
 	}
@@ -104,7 +106,7 @@ type krb5Transport struct {
 func (t *krb5Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	err = gokrbSPNEGO.SetSPNEGOHeader(t.kerberosClient, req, "")
 	if err != nil {
-		return nil, xerrors.Errorf("error setting SPNEGO header: %v", err)
+		return nil, fmt.Errorf("error setting SPNEGO header: %w", err)
 	}
 	return t.baseTransport.RoundTrip(req)
 }

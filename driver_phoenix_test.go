@@ -22,7 +22,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -183,7 +182,7 @@ func TestPhoenixDataTypes(t *testing.T) {
 			varbinValue   []byte    = []byte("testtesttest")
 		)
 
-		copy(binValue[:], []byte("test"))
+		copy(binValue[:], "test")
 
 		dbt.mustExec(`UPSERT INTO `+dbt.tableName+` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			integerValue,
@@ -780,7 +779,7 @@ func TestPhoenixStoreAndRetrieveBinaryData(t *testing.T) {
 
 		filePath := filepath.Join("test-fixtures", "calcite.png")
 
-		file, err := ioutil.ReadFile(filePath)
+		file, err := os.ReadFile(filePath)
 
 		if err != nil {
 			t.Fatalf("Unable to read text-fixture: %s", filePath)

@@ -20,17 +20,18 @@ package avatica
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 
-	"github.com/apache/calcite-avatica-go/v5/errors"
+	avaticaErrors "github.com/apache/calcite-avatica-go/v5/errors"
 	"github.com/apache/calcite-avatica-go/v5/message"
-	"golang.org/x/xerrors"
 )
 
 type conn struct {
-	connectionId string
-	config       *Config
-	httpClient   *httpClient
-	adapter      Adapter
+	connectionId  string
+	config        *Config
+	httpClient    *httpClient
+	adapter       Adapter
+	connectorInfo map[string]string
 }
 
 // Prepare returns a prepared statement, bound to this connection.
@@ -59,7 +60,7 @@ func (c *conn) prepare(ctx context.Context, query string) (driver.Stmt, error) {
 		statementID:  prepareResponse.Statement.Id,
 		conn:         c,
 		parameters:   prepareResponse.Statement.Signature.Parameters,
-		handle:       *prepareResponse.Statement,
+		handle:       prepareResponse.Statement,
 		batchUpdates: make([]*message.UpdateBatch, 0),
 	}, nil
 }
@@ -144,9 +145,12 @@ func (c *conn) exec(ctx context.Context, query string, args []namedValue) (drive
 		return nil, c.avaticaErrorToResponseErrorOrError(err)
 	}
 
+	statementID := st.(*message.CreateStatementResponse).StatementId
+	defer c.closeStatement(context.Background(), statementID)
+
 	res, err := c.httpClient.post(ctx, &message.PrepareAndExecuteRequest{
 		ConnectionId:      c.connectionId,
-		StatementId:       st.(*message.CreateStatementResponse).StatementId,
+		StatementId:       statementID,
 		Sql:               query,
 		MaxRowsTotal:      c.config.maxRowsTotal,
 		FirstFrameMaxSize: c.config.frameMaxSize,
@@ -187,28 +191,31 @@ func (c *conn) query(ctx context.Context, query string, args []namedValue) (driv
 		return nil, c.avaticaErrorToResponseErrorOrError(err)
 	}
 
+	statementID := st.(*message.CreateStatementResponse).StatementId
+
 	res, err := c.httpClient.post(ctx, &message.PrepareAndExecuteRequest{
 		ConnectionId:      c.connectionId,
-		StatementId:       st.(*message.CreateStatementResponse).StatementId,
+		StatementId:       statementID,
 		Sql:               query,
 		MaxRowsTotal:      c.config.maxRowsTotal,
 		FirstFrameMaxSize: c.config.frameMaxSize,
 	})
 
 	if err != nil {
+		_ = c.closeStatement(context.Background(), statementID)
 		return nil, c.avaticaErrorToResponseErrorOrError(err)
 	}
 
 	resultSets := res.(*message.ExecuteResponse).Results
 
-	return newRows(c, st.(*message.CreateStatementResponse).StatementId, resultSets), nil
+	return newRows(c, statementID, true, resultSets), nil
 }
 
 func (c *conn) avaticaErrorToResponseErrorOrError(err error) error {
 
 	var avaticaErr avaticaError
 
-	ok := xerrors.As(err, &avaticaErr)
+	ok := errors.As(err, &avaticaErr)
 
 	if !ok {
 		return err
@@ -218,14 +225,31 @@ func (c *conn) avaticaErrorToResponseErrorOrError(err error) error {
 		return c.adapter.ErrorResponseToResponseError(avaticaErr.message)
 	}
 
-	return errors.ResponseError{
+	return avaticaErrors.ResponseError{
 		Exceptions:   avaticaErr.message.Exceptions,
 		ErrorMessage: avaticaErr.message.ErrorMessage,
 		Severity:     int8(avaticaErr.message.Severity),
-		ErrorCode:    errors.ErrorCode(avaticaErr.message.ErrorCode),
-		SqlState:     errors.SQLState(avaticaErr.message.SqlState),
-		Metadata: &errors.RPCMetadata{
+		ErrorCode:    avaticaErrors.ErrorCode(avaticaErr.message.ErrorCode),
+		SqlState:     avaticaErrors.SQLState(avaticaErr.message.SqlState),
+		Metadata: &avaticaErrors.RPCMetadata{
 			ServerAddress: message.ServerAddressFromMetadata(avaticaErr.message),
 		},
 	}
+}
+
+// ResetSession implements driver.SessionResetter.
+// (From Go 1.10)
+func (c *conn) ResetSession(_ context.Context) error {
+	if c.connectionId == "" {
+		return driver.ErrBadConn
+	}
+	return nil
+}
+
+func (c *conn) closeStatement(ctx context.Context, statementID uint32) error {
+	_, err := c.httpClient.post(context.Background(), &message.CloseStatementRequest{
+		ConnectionId: c.connectionId,
+		StatementId:  statementID,
+	})
+	return c.avaticaErrorToResponseErrorOrError(err)
 }

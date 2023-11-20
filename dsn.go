@@ -18,12 +18,12 @@
 package avatica
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/xerrors"
 )
 
 type authentication int
@@ -74,7 +74,7 @@ func ParseDSN(dsn string) (*Config, error) {
 	parsed, err := url.ParseRequestURI(dsn)
 
 	if err != nil {
-		return nil, xerrors.Errorf("unable to parse DSN: %v", err)
+		return nil, fmt.Errorf("unable to parse DSN: %w", err)
 	}
 
 	queries := parsed.Query()
@@ -88,7 +88,7 @@ func ParseDSN(dsn string) (*Config, error) {
 		maxRowTotal, err := strconv.Atoi(v)
 
 		if err != nil {
-			return nil, xerrors.Errorf("invalid value for maxRowsTotal: %v", err)
+			return nil, fmt.Errorf("invalid value for maxRowsTotal: %w", err)
 		}
 
 		conf.maxRowsTotal = int64(maxRowTotal)
@@ -99,7 +99,7 @@ func ParseDSN(dsn string) (*Config, error) {
 		maxRowTotal, err := strconv.Atoi(v)
 
 		if err != nil {
-			return nil, xerrors.Errorf("invalid value for frameMaxSize: %v", err)
+			return nil, fmt.Errorf("invalid value for frameMaxSize: %w", err)
 		}
 
 		conf.frameMaxSize = int32(maxRowTotal)
@@ -110,7 +110,7 @@ func ParseDSN(dsn string) (*Config, error) {
 		loc, err := time.LoadLocation(v)
 
 		if err != nil {
-			return nil, xerrors.Errorf("invalid value for location: %v", err)
+			return nil, fmt.Errorf("invalid value for location: %w", err)
 		}
 
 		conf.location = loc
@@ -121,11 +121,11 @@ func ParseDSN(dsn string) (*Config, error) {
 		isolation, err := strconv.Atoi(v)
 
 		if err != nil {
-			return nil, xerrors.Errorf("invalid value for transactionIsolation: %v", err)
+			return nil, fmt.Errorf("invalid value for transactionIsolation: %w", err)
 		}
 
 		if isolation < 0 || isolation > 8 || isolation&(isolation-1) != 0 {
-			return nil, xerrors.Errorf("transactionIsolation must be 0, 1, 2, 4 or 8, %d given", isolation)
+			return nil, fmt.Errorf("transactionIsolation must be 0, 1, 2, 4 or 8, %d given", isolation)
 		}
 
 		conf.transactionIsolation = uint32(isolation)
@@ -148,7 +148,7 @@ func ParseDSN(dsn string) (*Config, error) {
 		} else if auth == "SPNEGO" {
 			conf.authentication = spnego
 		} else {
-			return nil, xerrors.New("authentication must be either BASIC, DIGEST or SPNEGO")
+			return nil, errors.New("authentication must be either BASIC, DIGEST or SPNEGO")
 		}
 
 		if conf.authentication == basic || conf.authentication == digest {
@@ -156,7 +156,7 @@ func ParseDSN(dsn string) (*Config, error) {
 			user := queries.Get("avaticaUser")
 
 			if user == "" {
-				return nil, xerrors.Errorf("authentication is set to %s, but avaticaUser is empty", v)
+				return nil, fmt.Errorf("authentication is set to %s, but avaticaUser is empty", v)
 			}
 
 			conf.avaticaUser = user
@@ -164,7 +164,7 @@ func ParseDSN(dsn string) (*Config, error) {
 			pass := queries.Get("avaticaPassword")
 
 			if pass == "" {
-				return nil, xerrors.Errorf("authentication is set to %s, but avaticaPassword is empty", v)
+				return nil, fmt.Errorf("authentication is set to %s, but avaticaPassword is empty", v)
 			}
 
 			conf.avaticaPassword = pass
@@ -179,15 +179,15 @@ func ParseDSN(dsn string) (*Config, error) {
 			krb5CredentialCache := queries.Get("krb5CredentialCache")
 
 			if principal == "" && keytab == "" && krb5Conf == "" && krb5CredentialCache == "" {
-				return nil, xerrors.New("when using SPNEGO authetication, you must provide the principal, keytab and krb5Conf parameters or a krb5TicketCache parameter")
+				return nil, errors.New("when using SPNEGO authetication, you must provide the principal, keytab and krb5Conf parameters or a krb5TicketCache parameter")
 			}
 
 			if !((principal != "" && keytab != "" && krb5Conf != "") || (principal == "" && keytab == "" && krb5Conf == "")) {
-				return nil, xerrors.New("when using SPNEGO authentication with a principal and keytab, the principal, keytab and krb5Conf parameters are required")
+				return nil, errors.New("when using SPNEGO authentication with a principal and keytab, the principal, keytab and krb5Conf parameters are required")
 			}
 
 			if (principal != "" || keytab != "" || krb5Conf != "") && krb5CredentialCache != "" {
-				return nil, xerrors.New("ambigious configuration for SPNEGO authentication: use either principal, keytab and krb5Conf or krb5TicketCache")
+				return nil, errors.New("ambigious configuration for SPNEGO authentication: use either principal, keytab and krb5Conf or krb5TicketCache")
 			}
 
 			if principal != "" {
@@ -195,7 +195,7 @@ func ParseDSN(dsn string) (*Config, error) {
 				splittedPrincipal := strings.Split(principal, "@")
 
 				if len(splittedPrincipal) != 2 {
-					return nil, xerrors.Errorf("invalid kerberos principal (%s): the principal should be in the format primary/instance@realm where instance is optional", principal)
+					return nil, fmt.Errorf("invalid kerberos principal (%s): the principal should be in the format primary/instance@realm where instance is optional", principal)
 				}
 
 				conf.principal = krb5Principal{
@@ -212,7 +212,8 @@ func ParseDSN(dsn string) (*Config, error) {
 	}
 
 	if parsed.Path != "" {
-		conf.schema = strings.TrimPrefix(parsed.Path, "/")
+		s := strings.Split(parsed.Path, "/")
+		conf.schema = s[len(s)-1]
 	}
 
 	parsed.User = nil

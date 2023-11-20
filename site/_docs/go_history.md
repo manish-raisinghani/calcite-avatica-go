@@ -28,7 +28,108 @@ For a full list of releases, see
 Downloads are available on the
 [downloads page]({{ site.baseurl }}/downloads/avatica-go.html).
 
-## <a href="https://github.com/apache/calcite-avatica-go/releases/tag/v5.0.0">5.0.0</a> / 2020-06-XX
+## <a href="https://github.com/apache/calcite-avatica-go/releases/tag/v5.2.0">5.2.0</a> / 2022-10-13
+{: #v5-2-0}
+
+Apache Calcite Avatica Go 5.2.0 is a maintenance release of Avatica Go with some dependency updates, bug fixes and a new
+minor feature. This release supports Go 1.18 and 1.19, which are currently the versions supported and maintained by the
+Go team.
+
+The `xinsnake/go-http-digest-auth-client` digest authentication client has been replaced with `icholy/digest` as the
+former has been deprecated and is no longer maintained.
+
+The `driver.SessionResetter` has also been implemented, allowing stale connections to the server to be purged and reset.
+
+Contributors to this release:
+Francis Chuang, Guozhong Li
+
+Features and bug fixes
+
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5072">CALCITE-5072</a>]
+  Index out of range when calling rows.Next()
+* Add Apache license header to website publication Github workflows
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5077">CALCITE-5077</a>]
+  ResetSession implements driver.SessionResetter
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-4147">CALCITE-4147</a>]
+  Rename "master" branch to "main"
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5234">CALCITE-5234</a>]
+  Remove witch / live-reload support for development
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5237">CALCITE-5237</a>]
+  Upgrade dependencies and regenerate protobufs
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5312">CALCITE-5312</a>]
+  Replace http digest auth library with github.com/icholy/digest
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5317">CALCITE-5317</a>]
+  Remove redundant type declarations
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5318">CALCITE-5318</a>]
+  Replace deprecated ioutil methods with io and os equivalents
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5319">CALCITE-5319</a>]
+  Remove DualStack dial option in HTTP client as it is deprecated and enabled by default
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5320">CALCITE-5320</a>]
+  Switch from deprecated_first_frame_max_size to first_frame_max_size protobuf member for setting the first frame max size
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5322">CALCITE-5322</a>]
+  Remove deprecated build tags
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5323">CALCITE-5323</a>]
+  Do not copy lock handle in statement
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5324">CALCITE-5324</a>]
+  Cancel context in tests
+* Make directory safe for git in docker release script
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5325">CALCITE-5325</a>]
+  Display errors when failing release guidelines check using docker release script
+* Add missing license headers to files
+
+Tests
+
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5235">CALCITE-5235</a>]
+  Run Github Actions tests using docker and upgrade Go
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5236">CALCITE-5236</a>]
+  Test against Avatica 1.22 by default in docker-compose.yml
+
+Web site and documentation:
+
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-3129">CALCITE-3129</a>]
+  Automate website builds
+* Push website only if there are changes
+* Link Go reference to the latest version of the documentation
+* Fix formatting in documentation
+
+## <a href="https://github.com/apache/calcite-avatica-go/releases/tag/v5.1.0">5.1.0</a> / 2022-03-27
+{: #v5-1-0}
+
+Apache Calcite Avatica Go 5.1.0 is a maintenance release of Avatica Go with some dependency updates and bug fixes.
+This release supports Go 1.17 and 1.18, which are currently the versions supported and maintained by the Go team.
+
+The protobuf library [github.com/golang/protobuf](https://github.com/golang/protobuf) was replaced by
+[google.golang.org/protobuf](https://pkg.go.dev/google.golang.org/protobuf), which is the successor and replacement for
+the former. In addition, the [golang.org/x/xerrors](https://pkg.go.dev/golang.org/x/xerrors) package has been replaced with 
+the standard library's built-in [errors](https://pkg.go.dev/errors) package as the features in the experimental `xerrors`
+package have been available in the standard library's `errors` package since Go 1.13.
+
+Contributors to this release:
+Francis Chuang, Josiah Goodson
+
+Features and bug fixes
+
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-4174">CALCITE-4174</a>]
+  avatica-go should handle complex/long URLs
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5057">CALCITE-5057</a>]
+  Switch from github.com/golang/protobuf to google.golang.org/protobuf
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5058">CALCITE-5058</a>]
+  Upgrade dependencies and tidy go.mod
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5063">CALCITE-5063</a>]
+  Replace golang.org/x/xerrors package with errors package in stdlib
+
+Tests
+
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-4299">CALCITE-4299</a>]
+  Test against Go 1.14 and 1.15
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5055">CALCITE-5055</a>]
+  Test against Go 1.17 and 1.18
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5056">CALCITE-5056</a>]
+  Test against avatica 1.18 - 1.20
+* [<a href="https://issues.apache.org/jira/browse/CALCITE-5059">CALCITE-5059</a>]
+  Update Github Actions to latest versions
+
+## <a href="https://github.com/apache/calcite-avatica-go/releases/tag/v5.0.0">5.0.0</a> / 2020-07-16
 {: #v5-0-0}
 
 Apache Calcite Avatica Go 5.0.0 is a major release of Avatica Go with a number of improvements and a breaking change.

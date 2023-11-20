@@ -19,7 +19,7 @@ limitations under the License.
 
 # Apache Avatica/Phoenix SQL Driver
 
-[![GoDoc](https://godoc.org/github.com/apache/calcite-avatica-go?status.png)](https://godoc.org/github.com/apache/calcite-avatica-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/apache/calcite-avatica-go/v5.svg)](https://pkg.go.dev/github.com/apache/calcite-avatica-go/v5)
 [![Build Status](https://github.com/apache/calcite-avatica-go/workflows/Tests/badge.svg)](https://github.com/apache/calcite-avatica-go)
 
 Apache Calcite's Avatica Go is a Go [database/sql](https://golang.org/pkg/database/sql/) driver for the Avatica server.
@@ -56,4 +56,4 @@ page](https://calcite.apache.org/avatica/docs/go_history.html).
 
 ## Issues
 We do not use Github to file issues. Please create an issue on [Calcite's JIRA](https://issues.apache.org/jira/projects/CALCITE/issues)
-and select `avatica-go` as the component.
+and select `avatica-go` as the component. For further information, please see the [JIRA accounts guide](https://calcite.apache.org/develop/#jira-accounts).
