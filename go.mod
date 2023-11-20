@@ -1,4 +1,4 @@
-module github.com/zeroen/calcite-avatica-go/v5
+module github.com/manish-raisinghani/calcite-avatica-go/v5
 
 go 1.17
 
